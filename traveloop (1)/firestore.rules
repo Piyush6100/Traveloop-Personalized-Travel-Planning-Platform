@@ -1,0 +1,155 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // GLOBALS & HELPERS
+    // -------------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------------------
+    // VALIDATION HELPERS
+    // -------------------------------------------------------------------------
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email']) &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidTrip(data) {
+      return data.keys().hasAll(['name', 'ownerId', 'startDate', 'endDate']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.ownerId == request.auth.uid &&
+             data.startDate is string && data.endDate is string &&
+             (!data.keys().contains('description') || data.description is string) &&
+             (!data.keys().contains('status') || data.status in ['ongoing', 'upcoming', 'completed']);
+    }
+
+    function isValidStop(data) {
+      return data.keys().hasAll(['cityName', 'startDate', 'endDate', 'order']) &&
+             data.cityName is string && data.cityName.size() <= 100 &&
+             data.order is int;
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['name', 'cost']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.cost is number;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['content', 'type']) &&
+             data.content is string && data.content.size() <= 5000;
+    }
+
+    function isValidChecklistItem(data) {
+      return data.keys().hasAll(['item', 'category', 'isPacked']) &&
+             data.item is string && data.item.size() <= 200;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['category', 'amount', 'date']) &&
+             data.amount is number;
+    }
+
+    function isValidCommunityPost(data) {
+      return data.keys().hasAll(['tripId', 'userId', 'tripName']) &&
+             data.userId == request.auth.uid;
+    }
+
+    // -------------------------------------------------------------------------
+    // COLLECTIONS
+    // -------------------------------------------------------------------------
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Trips
+    match /trips/{tripId} {
+      function getTrip() {
+        return get(/databases/$(database)/documents/trips/$(tripId)).data;
+      }
+
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.isPublic == true || isAdmin());
+      allow create: if isSignedIn() && isValidTrip(incoming());
+      allow update: if (isSignedIn() && existing().ownerId == request.auth.uid && isValidTrip(incoming())) || isAdmin();
+      allow delete: if (isSignedIn() && existing().ownerId == request.auth.uid) || isAdmin();
+
+      // Subcollections for Trips
+      match /{path=**}/stops/{stopId} {
+        allow read: if isSignedIn() && (getTrip().ownerId == request.auth.uid || getTrip().isPublic == true || isAdmin());
+        allow write: if (isSignedIn() && getTrip().ownerId == request.auth.uid) || isAdmin();
+      }
+
+      match /notes/{noteId} {
+        allow read: if isSignedIn() && (getTrip().ownerId == request.auth.uid || isAdmin());
+        allow write: if (isSignedIn() && getTrip().ownerId == request.auth.uid) || isAdmin();
+      }
+
+      match /checklist/{itemId} {
+        allow read: if isSignedIn() && (getTrip().ownerId == request.auth.uid || isAdmin());
+        allow write: if (isSignedIn() && getTrip().ownerId == request.auth.uid) || isAdmin();
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isSignedIn() && (getTrip().ownerId == request.auth.uid || isAdmin());
+        allow write: if (isSignedIn() && getTrip().ownerId == request.auth.uid) || isAdmin();
+      }
+    }
+
+    // Activities (Subcollection of Stops - nested deeper)
+    match /trips/{tripId}/stops/{stopId}/activities/{activityId} {
+      function getTripNested() {
+        return get(/databases/$(database)/documents/trips/$(tripId)).data;
+      }
+      allow read: if isSignedIn() && (getTripNested().ownerId == request.auth.uid || getTripNested().isPublic == true || isAdmin());
+      allow write: if (isSignedIn() && getTripNested().ownerId == request.auth.uid) || isAdmin();
+    }
+
+    // Community Posts
+    match /communityPosts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidCommunityPost(incoming());
+      allow update: if (isSignedIn() && existing().userId == request.auth.uid && isValidCommunityPost(incoming())) || isAdmin();
+      allow delete: if (isSignedIn() && existing().userId == request.auth.uid) || isAdmin();
+    }
+
+    // Admins
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only manageable through Firebase Console/Admin SDK
+    }
+  }
+}

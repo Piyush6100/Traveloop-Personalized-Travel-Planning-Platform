@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account details and preferences",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "bio": { "type": "string" },
+        "preferences": {
+          "type": "object",
+          "properties": {
+            "language": { "type": "string" }
+          }
+        }
+      },
+      "required": ["email"]
+    },
+    "Trip": {
+      "title": "Travel Trip",
+      "description": "A multi-city travel plan",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "coverPhoto": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["ongoing", "upcoming", "completed"] }
+      },
+      "required": ["name", "ownerId", "startDate", "endDate"]
+    },
+    "Stop": {
+      "title": "Trip Stop",
+      "description": "A city or location in a trip",
+      "type": "object",
+      "properties": {
+        "cityName": { "type": "string" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "budget": { "type": "number" },
+        "order": { "type": "integer" }
+      },
+      "required": ["cityName", "startDate", "endDate", "order"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "An event or place to visit during a stop",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "time": { "type": "string" },
+        "cost": { "type": "number" },
+        "duration": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" }
+      },
+      "required": ["name", "cost"]
+    },
+    "Note": {
+      "title": "Trip Note",
+      "description": "A journal entry or reminder",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["general", "stop"] },
+        "stopId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "type"]
+    },
+    "ChecklistItem": {
+      "title": "Checklist Item",
+      "description": "An item to pack for the trip",
+      "type": "object",
+      "properties": {
+        "item": { "type": "string" },
+        "category": { "type": "string" },
+        "isPacked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["item", "category", "isPacked"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "A financial record for the trip",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "activityId": { "type": "string" }
+      },
+      "required": ["category", "amount", "date"]
+    },
+    "CommunityPost": {
+      "title": "Community Post",
+      "description": "A shared trip in the community tab",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "tripName": { "type": "string" },
+        "sharedAt": { "type": "string", "format": "date-time" },
+        "likes": { "type": "integer" },
+        "commentCount": { "type": "integer" }
+      },
+      "required": ["tripId", "userId", "tripName"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Master trips collection"
+    },
+    "/trips/{tripId}/stops/{stopId}": {
+      "schema": "Stop",
+      "description": "Cities visited in a trip"
+    },
+    "/trips/{tripId}/stops/{stopId}/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Activities planned for a stop"
+    },
+    "/trips/{tripId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "User notes and journal entries"
+    },
+    "/trips/{tripId}/checklist/{itemId}": {
+      "schema": "ChecklistItem",
+      "description": "Packing items"
+    },
+    "/trips/{tripId}/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Budget and actual expenses"
+    },
+    "/communityPosts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Publicly shared trips"
+    },
+    "/admins/{userId}": {
+      "schema": { "type": "object", "properties": {} },
+      "description": "Administrators"
+    }
+  }
+}
